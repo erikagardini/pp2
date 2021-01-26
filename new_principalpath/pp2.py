@@ -58,9 +58,6 @@ class PrincipalPath:
 
         #Plot Dijkstra path path
         path_to_plot = X[path, :]
-        path_start = X[0,:].reshape(1, X.shape[1])
-        path_end = X[-1,:].reshape(1, X.shape[1])
-        path_to_plot = np.concatenate((path_start, path_to_plot, path_end))
         self._plotPath(X, path_to_plot, filename = filename + "path_init")
 
         self.init_path = X[path, :]
@@ -71,9 +68,6 @@ class PrincipalPath:
             self.init_path, self.We = self.movePath()
 
             path_to_plot = self.init_path[:,:]
-            path_start = X[0, :].reshape(1, X.shape[1])
-            path_end = X[-1, :].reshape(1, X.shape[1])
-            path_to_plot = np.concatenate((path_start, path_to_plot, path_end))
             self._plotPath(X, path_to_plot, filename = filename + "path_updated")
 
         #Self tuning sigma
@@ -165,7 +159,7 @@ class PrincipalPath:
         sigma = tf.Variable(s, dtype='float64', trainable=False)
         return sigma
 
-    def optimize(self, X, s_span_1, s_span_2, l_rates, epochs, filename="", y_mode='length', criterion='elbow', plot=True):
+    def optimize(self, X, s_span_1, s_span_2, l_rates, epochs, filename="", y_mode='length', criterion='elbow', plot=True, mode='scatter'):
         best_s_span_1 = []
         for lr in l_rates:
             for s1 in s_span_1:
@@ -182,7 +176,7 @@ class PrincipalPath:
                                                      y_mode=y_mode, criterion=criterion)
 
                     if plot:
-                        utilities.plotPath(X, best_pp, sub_dir)
+                        utilities.plotPath(X, best_pp, sub_dir+"s1="+str(s1)+"_s2="+str(s2), mode=mode)
                     best_s_span_2.append(best_pp)
                     print("Waypoints optimized for for s1 = " + str(s1) + " and s2= " + str(s2) + ". Selected epoch: " + str(parameter) + ".\n")
 
@@ -191,15 +185,19 @@ class PrincipalPath:
                                                                  filename + "s1=" + str(s1), y_mode=y_mode,
                                                                  criterion=criterion, plot=True)
                 print("With s1 " + str(s1) + "fixed, the best s2 is " + str(parameter) + ".\n")
-                utilities.plotPath(X, best_s2, filename + "s1=" + str(s1))
+                if plot:
+                    utilities.plotPath(X, best_s2, filename + "s1=" + str(s1), mode=mode)
                 best_s_span_1.append(best_s2)
 
             # Model selection for s_span_1
             [final_best_path, parameter] = utilities.model_selection(np.array(best_s_span_1), s_span_1, X,
                                                                      filename + "final", y_mode=y_mode, criterion=criterion,
                                                                      plot=True)
-            utilities.plotPath(X, final_best_path, filename + "best_path_")
+            if plot:
+                utilities.plotPath(X, final_best_path, filename + "best_path_", mode=mode)
+
             print("The best s1 is " + str(parameter) + ".\n")
+            return final_best_path
 
     #Algorithm step 3 and 4
     def fit(self, X, reg_term_2=1.0, reg_term_3=1.0, lr=0.01, epochs=20, filename="", y_mode='length', criterion='elbow', plot_proba=False):

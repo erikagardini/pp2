@@ -7,10 +7,15 @@ import matplotlib.pyplot as plt
 #Number of waypoints
 NC = 50
 
-names = ["constellation"]#["constellation", "circle", "dmp", "gss"]
+names = ["constellation", "circle", "dmp", "gss"]
 for name in names:
     #Load dataset
     X = np.genfromtxt('../../datasets/2D_' + name + '.csv',delimiter=',')
+
+    #Repository for the results
+    dir_res = name + "_v2/"
+    if not os.path.exists(dir_res):
+        os.mkdir(dir_res)
 
     N = X.shape[0]
     d = X.shape[1]
@@ -28,7 +33,7 @@ for name in names:
     plt.scatter(X[boundary_ids[1], 0], X[boundary_ids[1], 1])
     plt.scatter(X[boundary_ids[0], 0], X[boundary_ids[0], 1])
 
-    plt.savefig("boundaries.png")
+    plt.savefig(dir_res + "boundaries.png")
     plt.close()'''
 
     #Parameters for the optimization
@@ -36,10 +41,6 @@ for name in names:
     s_span_1 = [0.0, 1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0]
     s_span_2 = [0.0, 1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0]
     lr = [0.01]
-
-    dir_res = name + "_v2/"
-    if not os.path.exists(dir_res):
-        os.mkdir(dir_res)
 
     #Model selection
     y_mode = 'length'

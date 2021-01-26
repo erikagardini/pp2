@@ -1,11 +1,15 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from mlxtend.data import loadlocal_mnist
-import linear_utilities as lu
-import principalpath as pp
+import original_principalpath.linear_utilities as lu
+import original_principalpath.principalpath as pp
 
 #Seed
 np.random.seed(1234)
+
+#Flag for local or global solution
+prefiltering = True
+
 #Number of waypoints
 NC=20
 
@@ -24,7 +28,7 @@ boundaries = [[568,270], [21,313], [75,19], [307,169], [457,422], [446,105]]
 
 for i in range(len(boundaries)):
 
-    print("Principal path from " + str(boundary_ids[0]) + " to " + str(boundary_ids[1]) + "\n")
+    print("Principal path from " + str(boundaries[i][0]) + " to " + str(boundaries[i][1]) + "\n")
 
     X = x_test
     d = X.shape[1]
@@ -45,8 +49,9 @@ for i in range(len(boundaries)):
     plt.close()
 
     #Prefilter the data for a local solution
-    #[X, boundary_ids, X_g]=pp.rkm_prefilter(X, boundary_ids, plot_ax=None)
-    #print("Data prefiltered\n")
+    if prefiltering:
+        [X, boundary_ids, X_g]=pp.rkm_prefilter(X, boundary_ids, plot_ax=None)
+        print("Data prefiltered\n")
 
     #Init waypoinys
     waypoint_ids = lu.initMedoids(X, NC, 'kpp',boundary_ids)
@@ -96,3 +101,14 @@ for i in range(len(boundaries)):
         plt.close()
 
     print("Plot of the models and the elbow completed\n")
+
+    best_path = models[s_elb_id, :, :]
+    edit_distances = []
+    for i in range(best_path.shape[0]-1):
+        edit_distance = np.sum(np.abs(best_path[i + 1, :] - best_path[i, :]))
+        edit_distances.append(edit_distance)
+
+    edit_distances = np.array(edit_distances)
+    print(np.mean(edit_distances))
+    print(np.std(edit_distances))
+    print(edit_distances)

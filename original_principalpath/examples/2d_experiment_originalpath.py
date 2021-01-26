@@ -19,12 +19,12 @@ for name in names:
     boundaries = {'circle': [512, 506],
          'constellation': [227,899],
          'dmp': [999,5],
-         'gss': [868,182]}
+         'gss': [833,199]}
     boundary_ids = boundaries.get(name)
     print("Principal path from " + str(boundary_ids[0]) + " to " + str(boundary_ids[1]) + "\n")
 
     #Prefiltering
-    prefiltering=True
+    prefiltering=False
     if prefiltering:
         X_old = X
         [X, boundary_ids, X_g]=pp.rkm_prefilter(X, boundary_ids, plot_ax=None)

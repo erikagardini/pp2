@@ -23,8 +23,8 @@ NC = 20
 
 #Parameters
 epochs = 20
-s_span_2 = [0.0, 1.0, 10.0, 100.0, 1000.0, 10000.0]
-s_span_1 = [0.0, 1.0, 10.0, 100.0, 1000.0, 10000.0]
+s_span_2 = [0.0, ]
+s_span_1 = [0]#[100.0, 1000.0, 10000.0, 100000.0, 1000000.0, 10000000.0]
 learning_rates = [0.01]
 
 #Boundaries
@@ -34,7 +34,7 @@ boundaries = [[568,270], [21,313], [75,19], [307,169], [457,422], [446,105]]
 y_mode = 'length'
 criterion = 'elbow'
 
-i=0
+i=6
 for el in boundaries:
     boundary_ids = el
     print("New principal path from " + str(boundary_ids[0]) + " to " + str(boundary_ids[1]) + "\n")
@@ -57,5 +57,15 @@ for el in boundaries:
     plt.close()
 
     pp = PrincipalPath(NC, boundary_ids, mode='self_tuning', batch_size=N)
-    pp.init(X, k=100, filename=dir_res)
-    pp.optimize(X, s_span_1, s_span_2, learning_rates, epochs, dir_res)
+    pp.init(X, k=10, filename=dir_res)
+    best_path = pp.optimize(X, s_span_1, s_span_2, learning_rates, epochs, dir_res, plot=True, mode='figure')
+
+edit_distances = []
+for i in range(best_path.shape[0]):
+    edit_distance = np.sum(np.abs(best_path[i+1, :] - best_path[i, :]))
+    edit_distances.append(edit_distance)
+
+edit_distances = np.array(edit_distances)
+print(np.mean(edit_distances))
+print(np.std(edit_distances))
+print(edit_distances)
