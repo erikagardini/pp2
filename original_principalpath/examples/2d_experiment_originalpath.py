@@ -24,7 +24,7 @@ for name in names:
     print("Principal path from " + str(boundary_ids[0]) + " to " + str(boundary_ids[1]) + "\n")
 
     #Prefiltering
-    prefiltering=False
+    prefiltering=True
     if prefiltering:
         X_old = X
         [X, boundary_ids, X_g]=pp.rkm_prefilter(X, boundary_ids, plot_ax=None)
@@ -62,7 +62,7 @@ for name in names:
     plt.close()
 
     #Plot the models
-    for i, s in enumerate(s_span):
+    '''for i, s in enumerate(s_span):
         path = models[i, :, :]
 
         if prefiltering:
@@ -72,6 +72,20 @@ for name in names:
         plt.plot(path[:,0], path[:,1], '-r')
 
         plt.savefig("pp_" + name + "_" + str(i) + ".png")
-        plt.close()
+        plt.close()'''
+
+    best_path = models[s_elb_id,:,:]
+    gss_centers = np.array([[1, 1], [2.2, 2], [3.4, 1], [4.6, 2], [5.8, 1]])
+    if prefiltering:
+        plt.scatter(X_old[:, 0], X_old[:, 1])
+    plt.scatter(X[:, 0], X[:, 1])
+    plt.scatter(best_path[:, 0], best_path[:, 1])
+    plt.plot(best_path[:, 0], best_path[:, 1], '-r')
+    plt.scatter(X[boundary_ids[0], 0], X[boundary_ids[0], 1])
+    plt.scatter(X[boundary_ids[0], 0], X[boundary_ids[1], 1])
+    plt.scatter(gss_centers[:, 0], gss_centers[:, 1], c='yellow')
+
+    plt.savefig("gss_centers" + ".png")
+    plt.close()
 
     print("Plot of the models and the elbow completed\n")
