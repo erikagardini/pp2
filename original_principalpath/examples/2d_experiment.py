@@ -2,16 +2,25 @@ import numpy as np
 from matplotlib import pyplot as plt
 import original_principalpath.principalpath as pp
 import original_principalpath.linear_utilities as lu
+import os
 
 #Seed
-np.random.seed(7)
+np.random.seed(1234)
+prefiltering = False
 
 #Number of waypoints
 NC=50
 
 #Load a 2d dataset
-names = ["gss"]#["circle", "constellation", "dmp"]#, "gss"]
+names = ["circle", "constellation", "dmp", "gss"]
 for name in names:
+    if prefiltering:
+        dir_res = name + "_prefiltering_" + str(prefiltering)+"/"
+    else:
+        dir_res = name + "_no_prefiltering_" + str(prefiltering)+"/"
+    if not os.path.exists(dir_res):
+        os.mkdir(dir_res)
+
     X=np.genfromtxt('../../datasets/2D_' + name + '.csv',delimiter=',')
     d = X.shape[1]
 
@@ -21,14 +30,17 @@ for name in names:
          'dmp': [999,5],
          'gss': [833,199]}
     boundary_ids = boundaries.get(name)
-    print("Principal path from " + str(boundary_ids[0]) + " to " + str(boundary_ids[1]) + "\n")
+    print("Principal path from " + str(boundary_ids[0]) + " to " + str(boundary_ids[1]))
 
     #Prefiltering
-    prefiltering=True
     if prefiltering:
         X_old = X
         [X, boundary_ids, X_g]=pp.rkm_prefilter(X, boundary_ids, plot_ax=None)
         print("Data prefiltered\n")
+        plt.scatter(X_old[:, 0], X_old[:, 1])
+        plt.scatter(X[:, 0], X[:, 1])
+        plt.savefig(dir_res + "/pp_filter" + name + "_" + str(200) + "_" + str(0.1) + "_" + str(1234) + ".png")
+        plt.close()
 
     #Init waypoints
     waypoint_ids = lu.initMedoids(X, NC, 'kpp', boundary_ids)
@@ -36,9 +48,16 @@ for name in names:
     W_init = X[waypoint_ids,:]
     print("Waypoints initialized\n")
 
+    if prefiltering:
+        plt.scatter(X_old[:, 0], X_old[:, 1])
+    plt.scatter(X[:, 0], X[:, 1])
+    plt.scatter(W_init[:, 0], W_init[:, 1])
+
+    plt.savefig(dir_res + "/pp_init" + name + "_" + str(1234) + ".png")
+    plt.close()
+
     #Waypoints optimization
-    s_span = np.logspace(5, -5)
-    s_span = np.hstack([s_span, 0])
+    s_span = np.array([1000000, 100000, 10000, 1000, 100, 10, 0])
     models = np.ndarray([s_span.size, NC+2, d])
     for j, s in enumerate(s_span):
         [W, u] = pp.rkm(X, W_init, s, plot_ax=None)
@@ -47,22 +66,16 @@ for name in names:
     print("Waypoints optimized\n")
 
     #Model selection
-    W_dst_var = pp.rkm_MS_pathvar(models, s_span, X)
-    s_elb_id = lu.find_elbow(np.stack([s_span, W_dst_var], -1))
-    print("Model selected: " + str(s_elb_id) + "\n")
+    evidence = pp.rkm_MS_evidence(models, s_span, X)
+    max_evidence = np.argmax(evidence)
+    print("Model selected: " + str(max_evidence) + "\n")
 
-    # Plot the elbow
-    plt.scatter(s_span, W_dst_var)
-    x_a = [s_span[0], s_span[-1]]
-    y_a = [W_dst_var[0], W_dst_var[-1]]
-    plt.plot(x_a, y_a, '-r')
-    plt.scatter(x_a, y_a)
-    plt.axvline(s_span[s_elb_id], 0, 1)
-    plt.savefig("elbowpp_" + name + ".png")
+    plt.plot(evidence)
+    plt.savefig(dir_res + "max_evidence.png")
     plt.close()
 
     #Plot the models
-    '''for i, s in enumerate(s_span):
+    for i, s in enumerate(s_span):
         path = models[i, :, :]
 
         if prefiltering:
@@ -71,21 +84,11 @@ for name in names:
         plt.scatter(path[:, 0], path[:, 1])
         plt.plot(path[:,0], path[:,1], '-r')
 
-        plt.savefig("pp_" + name + "_" + str(i) + ".png")
-        plt.close()'''
+        if i == max_evidence:
+            plt.savefig(dir_res + "pp_" + name + "_" + str(i) + "(best).png")
+        else:
+            plt.savefig(dir_res + "pp_" + name + "_" + str(i) + ".png")
 
-    best_path = models[s_elb_id,:,:]
-    gss_centers = np.array([[1, 1], [2.2, 2], [3.4, 1], [4.6, 2], [5.8, 1]])
-    if prefiltering:
-        plt.scatter(X_old[:, 0], X_old[:, 1])
-    plt.scatter(X[:, 0], X[:, 1])
-    plt.scatter(best_path[:, 0], best_path[:, 1])
-    plt.plot(best_path[:, 0], best_path[:, 1], '-r')
-    plt.scatter(X[boundary_ids[0], 0], X[boundary_ids[0], 1])
-    plt.scatter(X[boundary_ids[0], 0], X[boundary_ids[1], 1])
-    plt.scatter(gss_centers[:, 0], gss_centers[:, 1], c='yellow')
-
-    plt.savefig("gss_centers" + ".png")
-    plt.close()
+        plt.close()
 
     print("Plot of the models and the elbow completed\n")

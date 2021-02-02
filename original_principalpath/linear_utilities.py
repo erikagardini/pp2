@@ -53,24 +53,3 @@ def initMedoids(X, n, init_type, exclude_ids=[]):
         raise ValueError('init_type not recognized.')
 
     return(med_ids)
-
-
-def find_elbow(f):
-    """
-    Find the elbow in a function f, as the point on f with max distance from the line connecting f[0,:] and f[-1,:]
-
-    Args:
-        [ndarray float] f: function (Nx2 array in the form [x,f(x)])
-
-    Returns:
-        [int]  elb_id: index of the elbow
-    """
-    ps = np.asarray([f[0,0],f[0,1]])
-    pe = np.asarray([f[-1,0],f[-1,1]])
-    p_line_dst = np.ndarray(f.shape[0]-2,float)
-    for i in range(1,f.shape[0]-1):
-        p = np.asarray([f[i,0],f[i,1]])
-        p_line_dst[i-1] = np.linalg.norm(np.cross(pe-ps,ps-p))/np.linalg.norm(pe-ps)
-    elb_id = np.argmax(p_line_dst)+1
-
-    return elb_id

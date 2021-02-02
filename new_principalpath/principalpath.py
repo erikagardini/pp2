@@ -2,8 +2,6 @@ import numpy as np
 from scipy.spatial import distance
 from scipy.sparse import csgraph
 from matplotlib import pyplot
-import original_principalpath.linear_utilities as lu
-import tensorflow as tf
 
 def rkm(X, init_W, s, plot_ax=None):
     """
@@ -91,7 +89,6 @@ def rkm(X, init_W, s, plot_ax=None):
     
     return W, u
 
-
 def rkm_prefilter(X, boundary_ids, k = 10, NC = 20, name=""):
     # Put the boundaries at the beginning and the end of the input matrix X
     X_ = np.delete(X, (boundary_ids[0], boundary_ids[1]), axis=0)
@@ -99,22 +96,8 @@ def rkm_prefilter(X, boundary_ids, k = 10, NC = 20, name=""):
     final = X[boundary_ids[1], :].reshape(1, X.shape[1])
     X = np.concatenate((initial, X_, final))
 
-    # Compute Dijkstra
+    #Build penalized graph
     dst_mat = distance.cdist(X, X, 'sqeuclidean')
-
-    '''dst = distance.cdist(X, X, 'euclidean')
-    ind = np.argsort(dst, axis=1)
-    sigma_x = np.zeros(dst.shape[0], dtype='float32')
-    for i in range(dst.shape[0]):
-        sigma_x[i] = dst[i, ind[i, 7]]
-
-    a = np.transpose(np.tile(sigma_x, (X.shape[0], 1)))
-    b = np.tile(sigma_x, (X.shape[0], 1))
-    s_matrix = a * b
-
-    kernel_matrix = np.exp(-1 * (np.divide(dst_mat, s_matrix)))
-
-    kernel_distance = (2-(2*kernel_matrix))**2'''
 
     if k != X.shape[1]:
         idxs = np.argsort(dst_mat, axis=1)[:, 1:k + 1]
@@ -123,6 +106,7 @@ def rkm_prefilter(X, boundary_ids, k = 10, NC = 20, name=""):
                 if j not in idxs[i, :]:
                     dst_mat[i, j] = dst_mat[i, j] * 100000
 
+    #Compute Dijkstra
     [path_dst, path_pre] = csgraph.dijkstra(dst_mat, False, 0, True)
     path = np.ndarray(0, int)
 
@@ -132,10 +116,9 @@ def rkm_prefilter(X, boundary_ids, k = 10, NC = 20, name=""):
         i = path_pre[i]
     path = np.hstack([i, path])
 
-    # Plot Dijkstra path path
     dijkstra = X[path, :]
 
-    # Waypoints adjustment
+    # Linear interpolation
     if NC != dijkstra.shape[0]:
         init_path = movePath(dijkstra, NC)
 
@@ -195,44 +178,101 @@ def movePath(init_path, NC):
 
     return np.array(new_path)
 
-def rkm_MS_pathvar(models, s_span, X):
+
+def rkm_MS_evidence(models, s_span, X):
     """
-    Regularized K-means for principal path, MODEL SELECTION, variance on waypoints interdistance.
-
-    Args:
-        [ndarray float] models: matrix with path models, shape N_models x N x (NC+2)
-
-        [ndarray float] s_span: array with values of the reg parameter for each model (sorted in decreasing order, with 0 as last value)
-
-        [ndarray float] X: data matrix
-
-    Returns:
-        [ndarray float] W_dst_var: array with values of variance for each model
-    """
-    W_dst_var=np.ndarray(models.shape[0],float)
-    for i in range(models.shape[0]):
-        W = models[i,:,:]
-        W_dst=np.linalg.norm(W[1:,:]-W[0:-1,:],axis=1)
-        W_dst_var[i] = np.var(W_dst)
-
-    return W_dst_var
-
-def rkm_MS_pathlen(models, s_span, X):
-    """
-    Regularized K-means for principal path, MODEL SELECTION, Path length.
+    Regularized K-means for principal path, MODEL SELECTION, Bayesian Evidence.
     Args:
         [ndarray float] models: matrix with path models, shape N_models x N x (NC+2)
         [ndarray float] s_span: array with values of the reg parameter for each model (sorted in decreasing order, with 0 as last value)
         [ndarray float] X: data matrix
     Returns:
-        [ndarray float] len_s: array with values of path length for each model
+        [ndarray float] logE_s: array with values of log evidence for each model
     """
-    len_s=np.zeros(s_span.size,float)
+
+    if(s_span[-1]>0.0):
+        raise ValueError('In order to evaluate the evidence a model with s=0 has to be provided')
+
+    #Evaluate unregularized cost
+    cost_ureg=np.sum(rkm_cost(X, models[-1,:,:],s_span[-1]))
+
+    logE_s = np.ndarray(s_span.size,float)
     for i,s in enumerate(s_span):
+        N = X.shape[0]
         W = models[i,:,:]
         NC = W.shape[0]-2
-        for j,w in enumerate(W[0:-1,:]):
-            w_nxt = W[j+1,:]
-            len_s[i] = len_s[i] + np.sqrt(np.dot(w,w)+np.dot(w_nxt,w_nxt)-2*np.dot(w,w_nxt))
+        d = W.shape[1]
 
-    return len_s
+        #Set gamma (empirical rational) and compute lambda
+        gamma = np.sqrt(N)*0.125/np.mean(distance.cdist(X,X,'euclidean'))
+        lambd = s*gamma
+
+        #Maximum Posterior cost
+        cost_MP=np.sum(rkm_cost(X, W, s))
+
+        #Find labels
+        XW_dst = distance.cdist(X,W,'sqeuclidean')
+        u = XW_dst.argmin(1)
+        #Compute cardinality
+        W_card=np.zeros(NC+2,int)
+        for j in range(NC+2):
+            W_card[j] = np.sum(u==j)
+
+        #Construct boundary matrix
+        boundary = W[[0,NC+1],:]
+        B=np.zeros([NC,d],float)
+        B[[0,NC-1],:]=boundary
+
+        #Construct regularizer hessian
+        AW = np.diag(np.ones(NC))+np.diag(-0.5*np.ones(NC-1),1)+np.diag(-0.5*np.ones(NC-1),-1)
+
+        #Construct k-means hessian
+        AX = np.diag(W_card[1:NC+1])
+
+        #Compute global hessian
+        A = AX+s*AW
+
+        #Evaluate log-evidence
+        logE = -0.5*d*np.log(np.sum(np.linalg.eigvals(A)))
+        logE = logE + gamma*(cost_ureg-cost_MP)
+        if(lambd>0):
+            logE = logE + 0.5*d*NC*np.log(lambd)
+        else:
+            logE = logE + 0.5*d*NC*np.log(lambd+np.finfo(np.float).eps)
+
+        logE = logE - 0.125*lambd*np.trace(np.matmul(B.T,np.matmul(np.linalg.pinv(AW),B)))
+        logE = logE + 0.25*lambd*np.trace(np.matmul(B.T,B))
+
+        logE_s[i] = logE
+
+    return logE_s
+
+
+def rkm_cost(X, W, s):
+    """
+    Regularized K-means for principal path, COST EVALUATION.
+    (most stupid implementation)
+    Args:
+        [ndarray float] X: data matrix
+        [ndarray float] W: waypoints matrix
+        [float] s: regularization parameter
+    Returns:
+        [float] cost_km: K-means part of the cost
+        [float] cost_reg: regularizer part of the cost
+    """
+
+    XW_dst = distance.cdist(X, W, 'sqeuclidean')
+    u = XW_dst.argmin(1)
+
+    cost_km = 0.0
+    for i, x in enumerate(X):
+        w = W[u[i], :]
+        cost_km = cost_km + np.dot(x, x) + np.dot(w, w) - 2 * np.dot(x, w)
+
+    cost_reg = 0.0
+    for i, w in enumerate(W[0:-1, :]):
+        w_nxt = W[i + 1, :]
+        cost_reg = cost_reg + np.dot(w, w) + np.dot(w_nxt, w_nxt) - 2 * np.dot(w, w_nxt)
+    cost_reg = s * cost_reg
+
+    return cost_km, cost_reg

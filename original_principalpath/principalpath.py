@@ -71,7 +71,7 @@ def rkm(X, init_W, s, plot_ax=None):
         #compute new labels
         XW_dst = distance.cdist(X,W,'sqeuclidean')
         u_new = XW_dst.argmin(1)
-
+        temp = len(np.unique(u_new))
         #check for convergence
         converged = not np.sum(u_new!=u)
         u=u_new
@@ -184,24 +184,100 @@ def rkm_prefilter(X, boundary_ids, Nf=200, k=5, p=1000, T=0.1, plot_ax=None):
     return X[filter_mask,:], boundary_ids_filtered, X[np.logical_not(filter_mask),:]
 
 
-def rkm_MS_pathvar(models, s_span, X):
+def rkm_MS_evidence(models, s_span, X):
     """
-    Regularized K-means for principal path, MODEL SELECTION, variance on waypoints interdistance.
-
+    Regularized K-means for principal path, MODEL SELECTION, Bayesian Evidence.
     Args:
         [ndarray float] models: matrix with path models, shape N_models x N x (NC+2)
-
         [ndarray float] s_span: array with values of the reg parameter for each model (sorted in decreasing order, with 0 as last value)
-
         [ndarray float] X: data matrix
-
     Returns:
-        [ndarray float] W_dst_var: array with values of variance for each model
+        [ndarray float] logE_s: array with values of log evidence for each model
     """
-    W_dst_var=np.ndarray(models.shape[0],float)
-    for i in range(models.shape[0]):
-        W = models[i,:,:]
-        W_dst=np.linalg.norm(W[1:,:]-W[0:-1,:],axis=1)
-        W_dst_var[i] = np.var(W_dst)
 
-    return W_dst_var
+    if(s_span[-1]>0.0):
+        raise ValueError('In order to evaluate the evidence a model with s=0 has to be provided')
+
+    #Evaluate unregularized cost
+    cost_ureg=np.sum(rkm_cost(X, models[-1,:,:],s_span[-1]))
+
+    logE_s = np.ndarray(s_span.size,float)
+    for i,s in enumerate(s_span):
+        N = X.shape[0]
+        W = models[i,:,:]
+        NC = W.shape[0]-2
+        d = W.shape[1]
+
+        #Set gamma (empirical rational) and compute lambda
+        gamma = np.sqrt(N)*0.125/np.mean(distance.cdist(X,X,'euclidean'))
+        lambd = s*gamma
+
+        #Maximum Posterior cost
+        cost_MP=np.sum(rkm_cost(X, W, s))
+
+        #Find labels
+        XW_dst = distance.cdist(X,W,'sqeuclidean')
+        u = XW_dst.argmin(1)
+        #Compute cardinality
+        W_card=np.zeros(NC+2,int)
+        for j in range(NC+2):
+            W_card[j] = np.sum(u==j)
+
+        #Construct boundary matrix
+        boundary = W[[0,NC+1],:]
+        B=np.zeros([NC,d],float)
+        B[[0,NC-1],:]=boundary
+
+        #Construct regularizer hessian
+        AW = np.diag(np.ones(NC))+np.diag(-0.5*np.ones(NC-1),1)+np.diag(-0.5*np.ones(NC-1),-1)
+
+        #Construct k-means hessian
+        AX = np.diag(W_card[1:NC+1])
+
+        #Compute global hessian
+        A = AX+s*AW
+
+        #Evaluate log-evidence
+        logE = -0.5*d*np.log(np.sum(np.linalg.eigvals(A)))
+        logE = logE + gamma*(cost_ureg-cost_MP)
+        if(lambd>0):
+            logE = logE + 0.5*d*NC*np.log(lambd)
+        else:
+            logE = logE + 0.5*d*NC*np.log(lambd+np.finfo(np.float).eps)
+
+        logE = logE - 0.125*lambd*np.trace(np.matmul(B.T,np.matmul(np.linalg.pinv(AW),B)))
+        logE = logE + 0.25*lambd*np.trace(np.matmul(B.T,B))
+
+        logE_s[i] = logE
+
+    return logE_s
+
+
+def rkm_cost(X, W, s):
+    """
+    Regularized K-means for principal path, COST EVALUATION.
+    (most stupid implementation)
+    Args:
+        [ndarray float] X: data matrix
+        [ndarray float] W: waypoints matrix
+        [float] s: regularization parameter
+    Returns:
+        [float] cost_km: K-means part of the cost
+        [float] cost_reg: regularizer part of the cost
+    """
+
+    XW_dst = distance.cdist(X,W,'sqeuclidean')
+    u = XW_dst.argmin(1)
+
+    cost_km=0.0
+    for i,x in enumerate(X):
+        w = W[u[i],:]
+        cost_km = cost_km + np.dot(x,x) + np.dot(w,w) -2*np.dot(x,w)
+
+    cost_reg=0.0
+    for i,w in enumerate(W[0:-1,:]):
+        w_nxt = W[i+1,:]
+        cost_reg = cost_reg + np.dot(w,w) + np.dot(w_nxt,w_nxt) - 2*np.dot(w,w_nxt)
+    cost_reg = s*cost_reg
+
+    return cost_km, cost_reg
