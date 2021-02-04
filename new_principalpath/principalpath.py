@@ -89,7 +89,7 @@ def rkm(X, init_W, s, plot_ax=None):
     
     return W, u
 
-def rkm_prefilter(X, boundary_ids, k = 10, NC = 20, name=""):
+def rkm_prefilter(X, boundary_ids, k = 10, NC = 20, dst_mat=None):
     # Put the boundaries at the beginning and the end of the input matrix X
     X_ = np.delete(X, (boundary_ids[0], boundary_ids[1]), axis=0)
     initial = X[boundary_ids[0], :].reshape(1, X.shape[1])
@@ -97,14 +97,15 @@ def rkm_prefilter(X, boundary_ids, k = 10, NC = 20, name=""):
     X = np.concatenate((initial, X_, final))
 
     #Build penalized graph
-    dst_mat = distance.cdist(X, X, 'sqeuclidean')
+    if dst_mat is not None:
+        dst_mat = distance.cdist(X, X, 'sqeuclidean')
 
-    if k != X.shape[1]:
-        idxs = np.argsort(dst_mat, axis=1)[:, 1:k + 1]
-        for i in range(dst_mat.shape[0]):
-            for j in range(dst_mat.shape[1]):
-                if j not in idxs[i, :]:
-                    dst_mat[i, j] = dst_mat[i, j] * 100000
+        if k != X.shape[1]:
+            idxs = np.argsort(dst_mat, axis=1)[:, 1:k + 1]
+            for i in range(dst_mat.shape[0]):
+                for j in range(dst_mat.shape[1]):
+                    if j not in idxs[i, :]:
+                        dst_mat[i, j] = dst_mat[i, j] * 100000
 
     #Compute Dijkstra
     [path_dst, path_pre] = csgraph.dijkstra(dst_mat, False, 0, True)
