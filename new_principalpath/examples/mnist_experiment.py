@@ -121,4 +121,5 @@ for i in range(len(boundaries)):
             plt.savefig(dir_res + "/pp_mnist_" + str(i) + "_model_" + str(j) + "_nearest_face_.png")
         plt.close()
 
+    np.save(dir_res + "/pp_models_" + str(i), models)
     print("\n\n\n")

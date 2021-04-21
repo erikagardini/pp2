@@ -9,7 +9,7 @@ import os
 np.random.seed(1234)
 
 #Flag for local or global solution
-prefiltering = False
+prefiltering = True
 
 #Number of waypoints
 NC=20
@@ -89,5 +89,6 @@ for i in range(len(boundaries)):
         plt.close()
 
     print("Plot of the models completed")
+    np.save(dir_res + "/pp_models_" + str(i), models)
 
     print("\n\n\n")

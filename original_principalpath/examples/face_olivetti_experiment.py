@@ -4,6 +4,7 @@ import original_principalpath.linear_utilities as lu
 import original_principalpath.principalpath as pp
 from sklearn.datasets import fetch_olivetti_faces
 import os
+from scipy.spatial import distance
 
 #Seed
 np.random.seed(7)
@@ -88,6 +89,24 @@ for i in range(len(boundaries)):
             plt.savefig(dir_res + "/pp_face_"+ str(i)+"_model_" + str(j) + "_s=" + str(s) + ".png")
         plt.close()
 
-    print("Plot of the models completed")
+    # Plot the nearest picture corresponding to the waypoints of each model
+    for j, s in enumerate(s_span):
+        path = models[j, :, :]
+        dst_mat = distance.cdist(path, X, 'euclidean')
 
+        idxs = np.argsort(dst_mat, axis=1)[:, 0]
+        plt.figure(figsize=(15, 2))
+        n = path.shape[0]
+        for k in range(n):
+            # Display original
+            ax = plt.subplot(2, n, k + 1)
+            plt.imshow(X[idxs[k]].reshape(64, 64))
+            # plt.gray()
+            ax.get_xaxis().set_visible(False)
+            ax.get_yaxis().set_visible(False)
+            plt.savefig(dir_res + "/pp_face_" + str(i) + "_model_" + str(j) + "_nearest_face_.png")
+        plt.close()
+
+    print("Plot of the models completed")
+    np.save(dir_res + "/pp_models_" + str(i), models)
     print("\n\n\n")

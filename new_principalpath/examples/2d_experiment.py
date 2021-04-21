@@ -15,7 +15,7 @@ for name in names:
         os.mkdir(dir_res)
 
     # Load a 2d dataset
-    X=np.genfromtxt('../../datasets/2D_' + name + '.csv',delimiter=',')
+    X=np.genfromtxt('../../datasets/2D_' + name + '.csv', delimiter=',')
     d = X.shape[1]
 
     #Some boundaries by visual inspection
@@ -26,25 +26,32 @@ for name in names:
     boundary_ids = boundaries.get(name)
     print("Principal path from " + str(boundary_ids[0]) + " to " + str(boundary_ids[1]))
 
+    plt.scatter(X[:, 0], X[:, 1], c='C0', alpha=0.5)
+    plt.scatter(X[boundary_ids[0], 0], X[boundary_ids[0], 1], marker=(5, 1), s=300.0, alpha=1.0, c='g')
+    plt.scatter(X[boundary_ids[1], 0], X[boundary_ids[1], 1], marker=(5, 1), s=300.0, alpha=1.0, c='m')
+    plt.savefig(dir_res + "/boundaries.png")
+    plt.close()
+
     #Prefiltering
-    [dijkstra, init_path] = pp.rkm_prefilter(X, boundary_ids, k=5, NC=NC, name=name)
+    [dijkstra, init_path] = pp.rkm_prefilter(X, boundary_ids, k=5, NC=NC)
 
     #Plot the Dijkstra path
-    plt.scatter(X[:, 0], X[:, 1])
-    plt.scatter(dijkstra[:, 0], dijkstra[:, 1])
-    plt.plot(dijkstra[:, 0], dijkstra[:, 1], '-r')
-    plt.scatter(dijkstra[0, 0], dijkstra[0, 1])
-    plt.scatter(dijkstra[-1, 0], dijkstra[-1, 1])
+    plt.scatter(X[:, 0], X[:, 1], c='C0', alpha=0.5)
+    plt.plot(dijkstra[:, 0], dijkstra[:, 1], '-r', zorder=2)
+    plt.scatter(dijkstra[:, 0], dijkstra[:, 1],  c='C1', zorder=1)
+    plt.scatter(dijkstra[0, 0], dijkstra[0, 1], marker=(5, 1), s=300.0, alpha=1.0, c='g', zorder=10)
+    plt.scatter(dijkstra[-1, 0], dijkstra[-1, 1], marker=(5, 1), s=300.0, alpha=1.0, c='m', zorder=10)
+
 
     plt.savefig(dir_res + "/dijkstra_path.png")
     plt.close()
 
     #Plot the initialized path
-    plt.scatter(X[:, 0], X[:, 1])
-    plt.scatter(init_path[:, 0], init_path[:, 1])
-    plt.plot(init_path[:, 0], init_path[:, 1], '-r')
-    plt.scatter(init_path[0, 0], init_path[0, 1])
-    plt.scatter(init_path[-1, 0], init_path[-1, 1])
+    plt.scatter(X[:, 0], X[:, 1], c='C0', alpha=0.5)
+    plt.plot(init_path[:, 0], init_path[:, 1], '-r', zorder=2)
+    plt.scatter(init_path[:, 0], init_path[:, 1], c='C1', zorder=1)
+    plt.scatter(init_path[0, 0], init_path[0, 1], marker=(5, 1), s=300.0, alpha=1.0, c='g', zorder=10)
+    plt.scatter(init_path[-1, 0], init_path[-1, 1], marker=(5, 1), s=300.0, alpha=1.0, c='m', zorder=10)
 
     plt.savefig(dir_res + "/updated_path.png")
     plt.close()
@@ -74,9 +81,11 @@ for name in names:
     #Plot the models
     for i, s in enumerate(s_span):
         path = models[i, :, :]
-        plt.scatter(X[:, 0], X[:, 1])
-        plt.scatter(path[:, 0], path[:, 1])
-        plt.plot(path[:,0], path[:,1], '-r')
+        plt.scatter(X[:, 0], X[:, 1], c='C0', alpha=0.5)
+        plt.plot(path[:,0], path[:,1], '-r', zorder=2)
+        plt.scatter(path[:, 0], path[:, 1], c='C1', zorder=1)
+        plt.scatter(path[0, 0], path[0, 1], marker=(5, 1), s=300.0, alpha=1.0, c='g', zorder=10)
+        plt.scatter(path[-1, 0], path[-1, 1], marker=(5, 1), s=300.0, alpha=1.0, c='m', zorder=10)
         if i == max_evidence:
             plt.savefig(dir_res + "/pp_" + name + "_" + str(i) + "(best).png")
         else:

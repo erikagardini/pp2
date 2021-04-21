@@ -108,6 +108,7 @@ for i in range(len(boundaries)):
     for j, s in enumerate(s_span):
         path = models[j, :, :]
         dst_mat = distance.cdist(path, X, 'euclidean')
+
         idxs = np.argsort(dst_mat, axis=1)[:,0]
         plt.figure(figsize=(15, 2))
         n = path.shape[0]
@@ -121,4 +122,5 @@ for i in range(len(boundaries)):
             plt.savefig(dir_res + "/pp_face_" + str(i)+"_model_" + str(j)+ "_nearest_face_.png")
         plt.close()
 
+    np.save(dir_res + "/pp_models_" + str(i), models)
     print("\n\n\n")
